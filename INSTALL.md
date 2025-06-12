@@ -98,7 +98,7 @@ You can add your own various flags. `-Wl,-subsystem,console` should only be used
    ```bash
    mkdir build
    cd build
-   cmake -G "MinGW Makefiles" -DCMAKE_PREFIX_PATH="Drive:\Path\To\LibreSSL\build" ..
+   cmake -G "MinGW Makefiles" -DCMAKE_TOOLCHAIN_FILE=path/to/toolchain/toolchain.cmake ..
    ```
 4. Compile:  
    ```bash
