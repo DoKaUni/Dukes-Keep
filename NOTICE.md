@@ -62,6 +62,25 @@ freely, subject to the following restrictions:
 ## **Vulkan SDK**
 
 **Available at**: [https://vulkan.lunarg.com/](https://vulkan.lunarg.com/)
+### License
+
+```
+Copyright 2016-2025 LunarG Inc.
+
+The Vulkan SDK is comprised of 100% open-source components. The majority of the
+materials are MIT or Apache 2.0 licenses. The Vulkan SDK licensing registry
+(found at vulkan.lunarg.com) discloses all components in the SDK and their
+corresponding open source license. The SDK itself is not licensed because to do
+so would re-attribute licenses to all the things included in the SDK.
+
+ALL INFORMATION HERE IS PROVIDED "AS IS." LUNARG MAKES NO REPRESENTATIONS OR WARRANTIES,
+EXPRESS OR IMPLIED, WITH REGARD TO THIS LIST OR ITS ACCURACY OR COMPLETENESS,
+OR WITHRESPECT TO ANY RESULTS TO BE OBTAINED FROM USE OR DISTRIBUTION OF THE LIST.
+BY USING OR DISTRIBUTING THIS LIST, YOU AGREE THAT IN NO EVENT SHALL LUNARG BE HELD
+LIABLE FOR ANYDAMAGES WHATSOEVER RESULTING FROM ANY USE OR DISTRIBUTION OF THIS LIST,
+INCLUDING, WITHOUT LIMITATION, ANY SPECIAL, CONSEQUENTIAL, INCIDENTAL OR OTHER DIRECT
+OR INDIRECT DAMAGES.
+```
 
 ## **LibreSSL** (ISC License)
 
