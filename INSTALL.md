@@ -7,7 +7,7 @@ This guide covers how to build **Duke's Keep** from source, including dependenci
    - [Git](https://git-scm.com/)  
    - [CMake](https://cmake.org/) (≥3.14)  
    - [Tcl/Tk](https://www.magicsplat.com/tcl-installer/) (for SQLCipher)  
-   - C/C++ Compiler
+   - C/C++ Compiler (Supporting at least C++11)
 
 ## Step 1: Install Dependencies
 
@@ -74,7 +74,7 @@ cmake --build .
 ## Step 2: Build Duke's Keep
 1. Clone the repository:  
    ```bash
-   git clone https://github.com/DoKaUni/Dukes-Keep
+   git clone git clone --recurse-submodules https://github.com/DoKaUni/Dukes-Keep.git
    cd Dukes-Keep
    ```  
 2. Create a toolchain:\
