@@ -169,6 +169,7 @@ static void RenderMainUI(sqlite3* db, const int windowWidth, const int windowHei
 
 // Utility functions
 static int InputTextCallback(ImGuiInputTextCallbackData* data);
+static bool CheckPositiveInt(const int integer);
 static bool IsPrintableVirtualKey(UINT vkCode);
 
 int main(int, char**) {
@@ -390,6 +391,12 @@ static int InputTextCallback(ImGuiInputTextCallbackData* data) {
     return 0;
 }
 
+static bool CheckPositiveInt(const int integer) {
+    if(integer > 0 && integer <= INT_MAX)
+        return true;
+    return false;
+}
+
 static bool IsPrintableVirtualKey(UINT vkCode) {
     BYTE keyboardState[256];
     GetKeyboardState(keyboardState);
@@ -453,13 +460,13 @@ static void SettingsCheck(int& pasteTime, int& listenTime, int& showPasswordTime
     tempSectionLength = GetPrivateProfileIntA("Settings", "SectionLength", tempSectionLength, settingsFile.c_str());
     
     // Validate pasteTime (must be positive integer)
-    pasteTime = (tempPasteTime > 0) ? tempPasteTime : defaultPasteTime;
+    pasteTime = (tempPasteTime > 0 && tempPasteTime <= INT_MAX) ? tempPasteTime : defaultPasteTime;
     
     // Validate listenTime (must be positive integer)
-    listenTime = (tempListenTime > 0) ? tempListenTime : defaultListenTime;
+    listenTime = (tempListenTime > 0 && tempListenTime <= INT_MAX) ? tempListenTime : defaultListenTime;
 
     // Validate listenTime (must be positive integer)
-    showPasswordTime = (tempShowPasswordTime > 0) ? tempShowPasswordTime : defaultShowPasswordTime;
+    showPasswordTime = (tempShowPasswordTime > 0 && tempShowPasswordTime <= INT_MAX) ? tempShowPasswordTime : defaultShowPasswordTime;
     
     // Validate shortcutKey (must be within valid virtual key code range)
     // Typical virtual key codes are between 0x01 and 0xFE
@@ -1299,7 +1306,29 @@ static void RenderTagFilterWindow(ManagerTab& tab, sqlite3* db) {
 }
 
 static void RenderSettingsWindow() {
-    if (!showSettingsWindow) return;
+    static bool firstOpen = true;
+
+    static int tempPasteTime;
+    static int templistenTime;
+    static int tempShowPasswordTime;
+    static int tempShortcutKey;
+    static std::string tempShortcutKeyName;
+
+    if (firstOpen && showSettingsWindow) {
+        tempPasteTime = pasteTime;
+        templistenTime = listenTime;
+        tempShowPasswordTime = showPasswordTime;
+        tempShortcutKey = shortcutKey;
+        tempShortcutKeyName = shortcutKeyName;
+        
+        firstOpen = false;
+    }
+
+    if (!showSettingsWindow) {
+        firstOpen = true;
+
+        return;
+    }
 
     ImGui::SetNextWindowSize(ImVec2(400, 250), ImGuiCond_FirstUseEver);
     if (ImGui::Begin("Settings", &showSettingsWindow)) {
@@ -1307,19 +1336,25 @@ static void RenderSettingsWindow() {
         ImGui::Text("Paste Delay (Milliseconds):");
         ImGui::SameLine();
         ImGui::SetNextItemWidth(100);
-        ImGui::InputInt("##PasteTime", &pasteTime, 1, 1);
+        if(ImGui::InputInt("##PasteTime", &tempPasteTime, 1, 1))
+            if(!CheckPositiveInt(tempPasteTime))
+                tempPasteTime = 1;
 
         // Listen Time setting
         ImGui::Text("Pasting listening time (Seconds):");
         ImGui::SameLine();
         ImGui::SetNextItemWidth(100);
-        ImGui::InputInt("##ListenTime", &listenTime, 1, 1);
+        if(ImGui::InputInt("##ListenTime", &templistenTime, 1, 1))
+            if(!CheckPositiveInt(templistenTime))
+                templistenTime = 1;
 
         // Show Password Time setting
         ImGui::Text("Password show time (Seconds):");
         ImGui::SameLine();
         ImGui::SetNextItemWidth(100);
-        ImGui::InputInt("##ShowPasswordTime", &showPasswordTime, 1, 1);
+        if(ImGui::InputInt("##ShowPasswordTime", &tempShowPasswordTime, 1, 1))
+            if(!CheckPositiveInt(tempShowPasswordTime))
+                tempShowPasswordTime = 1;
 
         // Shortcut Key setting
         ImGui::Text("Paste Shortcut Key:");
@@ -1334,8 +1369,8 @@ static void RenderSettingsWindow() {
                     // Skip mouse buttons
                     if (vk >= VK_LBUTTON && vk <= VK_XBUTTON2) continue;
                     
-                    shortcutKey = vk;
-                    shortcutKeyName = GetKeyName(vk);
+                    tempShortcutKey = vk;
+                    tempShortcutKeyName = GetKeyName(vk);
                     capturingKey = false;
                     break;
                 }
@@ -1345,7 +1380,7 @@ static void RenderSettingsWindow() {
                 capturingKey = false;
             }
         } else {
-            ImGui::Text("%s", shortcutKeyName.c_str());
+            ImGui::Text("%s", tempShortcutKeyName.c_str());
             ImGui::SameLine();
             if (ImGui::Button("Change Key", ImVec2(100, 0))) {
                 capturingKey = true;
@@ -1353,13 +1388,27 @@ static void RenderSettingsWindow() {
         }
 
         if (ImGui::Button("Save", ImVec2(120, 30)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+            pasteTime = tempPasteTime;
+            listenTime = templistenTime;
+            showPasswordTime = tempShowPasswordTime;
+            shortcutKey = tempShortcutKey;
+            shortcutKeyName = tempShortcutKeyName;
+
             SaveSettings(pasteTime, listenTime, showPasswordTime, shortcutKey, sectionLength);
+
             showSettingsWindow = false;
+            firstOpen = true;
         }
         ImGui::SameLine();
         if (ImGui::Button("Cancel", ImVec2(120, 30))) {
-            LoadSettings();
+            tempPasteTime = pasteTime;
+            templistenTime = listenTime;
+            tempShowPasswordTime = showPasswordTime;
+            tempShortcutKey = shortcutKey;
+            tempShortcutKeyName = shortcutKeyName;
+            
             showSettingsWindow = false;
+            firstOpen = true;
         }
     }
     ImGui::End();
