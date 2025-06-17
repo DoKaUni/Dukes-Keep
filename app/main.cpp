@@ -12,6 +12,7 @@
 #include "fileUtils.h"
 #include "generation.h"
 #include "initialization.h"
+#include "keystore.h"
 #include "pasting.h"
 #include "sections.h"
 
@@ -365,6 +366,8 @@ int main(int, char**) {
     sqlite3_close(db);
     std::cout << "Database closed successfully!" << std::endl;
 
+    EphemeralKeyStorage::ClearKey();
+
     err = vkDeviceWaitIdle(g_Device);
     check_vk_result(err);
     ImGui_ImplVulkan_Shutdown();
@@ -591,6 +594,14 @@ static bool HandleLogin(const std::string& keyFile, const std::string& dbFile, s
             return false;
         }
 
+        try{
+            EphemeralKeyStorage::StoreKey(key);
+        } catch (const std::exception& e) {
+            std::cerr << "Error: " << e.what() << std::endl;
+
+            return false;
+        }
+
         unsigned char salt[SALT_SIZE];
         if(!GenerateRandomBytes(salt, SALT_SIZE)){
             return false;
@@ -612,6 +623,8 @@ static bool HandleLogin(const std::string& keyFile, const std::string& dbFile, s
 
             return false;
         }
+
+        key.clear();
         
         return true;
     } else {
@@ -630,6 +643,14 @@ static bool HandleLogin(const std::string& keyFile, const std::string& dbFile, s
 
         DerivePasswordKey(passwordInput, salt, derivedKey);
         decrypted  = DecryptData(encryptedData, derivedKey, key);
+
+        try{
+            EphemeralKeyStorage::StoreKey(key);
+        } catch (const std::exception& e) {
+            std::cerr << "Error: " << e.what() << std::endl;
+
+            return false;
+        }
         
         if(!decrypted){
             wrongPassword = true;
@@ -640,6 +661,8 @@ static bool HandleLogin(const std::string& keyFile, const std::string& dbFile, s
         if (!OpenDatabase(&db, dbFile.c_str(), key, db_exists)) {
             return false;
         }
+
+        key.clear();
 
         return true;
     }
@@ -755,7 +778,10 @@ static void SavePassword(sqlite3* db) {
 
     *password = GenerateRandomString(fullLength, characters);
     std::vector<unsigned char> encryptedPassword;
+
+    key = EphemeralKeyStorage::RetrieveKey();
     EncryptData(StringToVector(*password), key, nullptr, encryptedPassword);
+    key.clear();
     
     password.reset();
     
@@ -819,11 +845,13 @@ static std::string DecryptPassword(){
     auto password = std::make_unique<std::string>();
     auto decryptedData = std::make_unique<std::vector<unsigned char>>();
 
+    key = EphemeralKeyStorage::RetrieveKey();
     if(!DecryptData(currentPassword->GetPassword(), key, *decryptedData)){
         std::cerr << "Password decryption failed" << std::endl;
 
         return "";
     }
+    key.clear();
 
     *password = VectorToString(*decryptedData);
 
@@ -885,11 +913,13 @@ static void monitorKeyPress() {
             auto password = std::make_unique<std::string>();
             auto decryptedData = std::make_unique<std::vector<unsigned char>>();
 
+            key = EphemeralKeyStorage::RetrieveKey();
             if(!DecryptData(currentPassword->GetPassword(), key, *decryptedData)){
                 std::cerr << "Password decryption failed" << std::endl;
 
                 return;
             }
+            key.clear();
             
             *password = VectorToString(*decryptedData);
 
@@ -1320,7 +1350,7 @@ static void RenderSettingsWindow() {
         tempShowPasswordTime = showPasswordTime;
         tempShortcutKey = shortcutKey;
         tempShortcutKeyName = shortcutKeyName;
-        
+
         firstOpen = false;
     }
 

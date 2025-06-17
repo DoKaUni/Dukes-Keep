@@ -9,7 +9,7 @@
 #define KEY_SIZE 32 // 256-bit key
 #define IV_SIZE 16 // 128-bit IV
 #define SALT_SIZE 8
-#define ITERATIONS 10000 // Potentially change to 10 000 000
+#define ITERATIONS 1000000 // Potentially change to 10 000 000
 
 /**
  * Reads the contents of a file and stores it in a vector of unsigned chars.

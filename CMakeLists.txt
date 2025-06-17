@@ -49,6 +49,7 @@ set(SOURCES          # All .cpp files in src/
     src/fileUtils.cpp
     src/generation.cpp
     src/initialization.cpp
+    src/keystore.cpp
     src/pasting.cpp
     src/sections.cpp
 )

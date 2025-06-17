@@ -5,7 +5,7 @@ Duke's Keep is a open-source, completely machine local password manager that sec
 * 64bit Windows 10/11.
 
 ## <font color="red">This is currently a prototype/POC</font>
-In it's current build, Duke's Keep is made to showcase the functionalities of anti-malware (Spyware, Keylogger) counter-measures. It is currently still lacking a secure store for it's main encryption key while the program is running. Additionally there are no recovery options, if you've forgotten your master password. **In it's current form, it is not recommended to use this as your main password manager** *yet*.
+In it's current build, Duke's Keep is made to showcase the functionalities of anti-malware (Spyware, Keylogger) counter-measures. It's sensitive information can be accesible through the swap. Additionally there are no recovery options, if you've forgotten your master password. **In it's current form, it is not recommended to use this as your main password manager** *yet*.
 
 ## Releases
 You can view the current releases on the [releases page](https://github.com/DoKaUni/Dukes-Keep/releases). After you've downloaded one of the releases, make sure to also check if the MD5/SHA256 hash matches the ones given.
@@ -25,7 +25,7 @@ You can view the current releases on the [releases page](https://github.com/DoKa
 * Copying or automatically pasting your password without seeing it (Screen-recording spyware countermeasure)
 
 ## In development
-* Main encryption secure keystore
+* Make sensitive information locked to memory (no swap)
 * More robust error-handling
 * Better UX (informing the user of invalid inputs, errors)
 * Unit tests
