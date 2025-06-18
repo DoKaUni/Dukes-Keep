@@ -56,10 +56,11 @@ bool GenerateRandomBytes(unsigned char* buffer, int length);
  * @param seedLength The length of the seed in bytes.
  * @param fixedIV The fixed initialization vector (IV) to write to the file.
  * @param ivLength The length of the IV in bytes.
+ * @param key the encryption key used for encryption/decryption
  * 
  * @return True if the seed and IV were successfully saved to the file, False otherwise.
  */
-bool SaveSeedAndIV(const std::string& seedPath, const unsigned char* seed, int seedLength, const unsigned char* fixedIV, int ivLength);
+bool SaveSeedAndIV(const std::string& seedPath, const unsigned char* seed, int seedLength, const unsigned char* fixedIV, int ivLength,const std::vector<unsigned char>& key);
 
 /**
  * Loads a seed and fixed IV from a file or generates and saves new ones if not found.
@@ -69,8 +70,11 @@ bool SaveSeedAndIV(const std::string& seedPath, const unsigned char* seed, int s
  * @param seedLength The length of the seed in bytes.
  * @param fixedIV The buffer to load the IV into.
  * @param ivLength The length of the IV in bytes.
+ * @param key the encryption key used for encryption/decryption
+ * 
+ * @return True if the seed and IV were successfully loaded, False otherwise.
  */
-void LoadSeedAndIV(const std::string& seedPath, unsigned char* seed, int seedLength, unsigned char* fixedIV, int ivLength);
+bool LoadSeedAndIV(const std::string& seedPath, unsigned char* seed, int seedLength, unsigned char* fixedIV, int ivLength, const std::vector<unsigned char>& key);
 
 /**
  * Derives a cryptographic key from a seed and input string using SHA-256.

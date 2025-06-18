@@ -838,7 +838,10 @@ static std::string DecryptPassword(){
     auto fixedIV = std::make_unique<unsigned char[]>(IV_SIZE);
     auto genKey = std::make_unique<unsigned char[]>(KEY_SIZE);
 
-    LoadSeedAndIV(seedPath, seed.get(), KEY_SIZE, fixedIV.get(), IV_SIZE);
+    key = EphemeralKeyStorage::RetrieveKey();
+    LoadSeedAndIV(seedPath, seed.get(), KEY_SIZE, fixedIV.get(), IV_SIZE, key);
+    key.clear();
+
     DeriveKey(seed.get(), KEY_SIZE, input, genKey.get());
 
     auto sectionState = std::make_unique<bool>(GenerateRandomBoolean(genKey.get(), fixedIV.get()));
@@ -901,7 +904,10 @@ static void monitorKeyPress() {
             auto genKey = std::make_unique<unsigned char[]>(KEY_SIZE);
 
             // Derive key from the seed and input
-            LoadSeedAndIV(seedPath, seed.get(), KEY_SIZE, fixedIV.get(), IV_SIZE);
+            key = EphemeralKeyStorage::RetrieveKey();
+            LoadSeedAndIV(seedPath, seed.get(), KEY_SIZE, fixedIV.get(), IV_SIZE, key);
+            key.clear();
+
             DeriveKey(seed.get(), KEY_SIZE, input, genKey.get());
 
             seed.reset();

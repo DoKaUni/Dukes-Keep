@@ -1,4 +1,5 @@
 #include "generation.h"
+#include "encryption.h"
 
 void handleErrors() {
     char errorBuffer[512];
@@ -18,33 +19,56 @@ bool GenerateRandomBytes(unsigned char* buffer, int length) {
     return true;
 }
 
-bool SaveSeedAndIV(const std::string& seedPath, const unsigned char* seed, int seedLength, const unsigned char* fixedIV, int ivLength) {
-    std::ofstream file(seedPath, std::ios::binary);
+bool SaveSeedAndIV(const std::string& seedPath, const unsigned char* seed, int seedLength, const unsigned char* fixedIV, int ivLength,const std::vector<unsigned char>& key) 
+{
+    // Combine seed and IV into a single buffer
+    std::vector<unsigned char> seedIvData(seedLength + ivLength);
+    std::copy(seed, seed + seedLength, seedIvData.begin());
+    std::copy(fixedIV, fixedIV + ivLength, seedIvData.begin() + seedLength);
 
-    if (!file) {
-        std::cerr << "Error opening seed file for writing: " << seedPath << std::endl;
-        
+    // Generate salt and encrypt the data
+    unsigned char salt[SALT_SIZE];
+    if(!GenerateRandomBytes(salt, SALT_SIZE)){
+        return false;
+    }
+    
+    std::vector<unsigned char> encryptedData;
+    if (!EncryptData(seedIvData, key, salt, encryptedData)) {
         return false;
     }
 
-    file.write(reinterpret_cast<const char*>(seed), seedLength);
-    file.write(reinterpret_cast<const char*>(fixedIV), ivLength);
-
-    return true;
+    return WriteFile(seedPath, encryptedData);
 }
 
-void LoadSeedAndIV(const std::string& seedPath, unsigned char* seed, int seedLength, unsigned char* fixedIV, int ivLength) {
-        std::ifstream file(seedPath, std::ios::binary);
-    
-    if (!file) {
-        std::cerr << "Seed file not found. Generating a new seed and fixed IV." << std::endl;
+bool LoadSeedAndIV(const std::string& seedPath, unsigned char* seed, int seedLength, unsigned char* fixedIV, int ivLength, const std::vector<unsigned char>& key) 
+{
+    std::vector<unsigned char> encryptedData;
+    if (!ReadFile(seedPath, encryptedData)) {
+        // File doesn't exist, generate new seed and IV
+        std::cerr << "Seed file not found. Generating new seed and IV." << std::endl;
         GenerateRandomBytes(seed, seedLength);
         GenerateRandomBytes(fixedIV, ivLength);
-        SaveSeedAndIV(seedPath, seed, seedLength, fixedIV, ivLength);
-    } else {
-        file.read(reinterpret_cast<char*>(seed), seedLength);
-        file.read(reinterpret_cast<char*>(fixedIV), ivLength);
+        return SaveSeedAndIV(seedPath, seed, seedLength, fixedIV, ivLength, key);
     }
+
+    // Decrypt the data
+    std::vector<unsigned char> seedIvData;
+    if (!DecryptData(encryptedData, key, seedIvData)) {
+        std::cerr << "Failed to decrypt seed file." << std::endl;
+        return false;
+    }
+
+    // Verify we got enough data
+    if (seedIvData.size() != static_cast<size_t>(seedLength + ivLength)) {
+        std::cerr << "Invalid seed file contents." << std::endl;
+        return false;
+    }
+
+    // Split back into seed and IV
+    std::copy(seedIvData.begin(), seedIvData.begin() + seedLength, seed);
+    std::copy(seedIvData.begin() + seedLength, seedIvData.end(), fixedIV);
+
+    return true;
 }
 
 bool DeriveKey(const unsigned char* seed, int seedLength, const std::string& input, unsigned char* key) {
