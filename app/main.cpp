@@ -394,6 +394,13 @@ static int InputTextCallback(ImGuiInputTextCallbackData* data) {
     return 0;
 }
 
+static int CursorPosCallback(ImGuiInputTextCallbackData* data, int& cursorPos) {
+    if (data->EventFlag == ImGuiInputTextFlags_CallbackEdit) {
+        cursorPos = data->CursorPos;
+    }
+    return 0;
+}
+
 static bool CheckPositiveInt(const int integer) {
     if(integer > 0 && integer <= INT_MAX)
         return true;
@@ -687,9 +694,14 @@ static void Authentication(ImGuiIO& io, const std::string& keyFile, const std::s
         
         ImGui::SetCursorPosX((ImGui::GetWindowSize().x - 300) * 0.5f);
         ImGui::SetNextItemWidth(300);
-        ImGui::InputText("##Password", passwordInput, sizeof(passwordInput), 
-            ImGuiInputTextFlags_Password | ImGuiInputTextFlags_CallbackCharFilter, 
-            InputTextCallback);
+        ImGui::InputText("##Password", passwordInput, sizeof(passwordInput),
+            ImGuiInputTextFlags_Password | ImGuiInputTextFlags_CallbackCharFilter | ImGuiInputTextFlags_CallbackEdit,
+            [](ImGuiInputTextCallbackData* data) -> int {
+                if (InputTextCallback(data) != 0) return 1;
+
+                return CursorPosCallback(data, cursorPos);
+            }
+        );
 
         ImGui::Spacing();
 
@@ -983,17 +995,15 @@ static bool CheckCharBuffer(const char buffer[], const bool canBeEmpty) {
 static void HandleKeyPress(char* buffer, int& cursorPos, const std::string& keyboardKey) {
     if (keyboardKey == "Backspace") {
         if (cursorPos > 0) {
-            buffer[cursorPos - 1] = '\0';
-            cursorPos--;
+            buffer[--cursorPos] = '\0';
         }
-    } 
+    }
     else if (keyboardKey == "Caps") {
         capsLock = !capsLock;
     }
     // 64 is buffer size - 1
-    else if (keyboardKey != " " && cursorPos < 64) { 
-        buffer[cursorPos] = capsLock ? toupper(keyboardKey[0]) : keyboardKey[0];
-        cursorPos++;
+    else if (keyboardKey != " " && cursorPos < 64) {
+        buffer[cursorPos++] = capsLock ? toupper(keyboardKey[0]) : keyboardKey[0];
         buffer[cursorPos] = '\0';
     }
 }
