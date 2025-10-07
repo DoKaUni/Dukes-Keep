@@ -763,9 +763,16 @@ static void Authentication(ImGuiIO& io, const std::string& keyFile, const std::s
 
 static void SavePassword(sqlite3* db) {
     int userPasswordLength = passwordLengths[sectionLength - 2].at(entryWindowState.passwordLengthIndex);
+    std::unique_ptr<unsigned char[], VirtualLockDeleter> randomIV, genKey;
 
-    auto randomIV = std::make_unique<unsigned char[]>(IV_SIZE);
-    auto genKey = std::make_unique<unsigned char[]>(KEY_SIZE);
+    try {
+        randomIV = AllocateLockedMemory<unsigned char>(IV_SIZE);
+        genKey = AllocateLockedMemory<unsigned char>(KEY_SIZE);
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+
+        return;
+    }
 
     std::string characters = "";
 
@@ -842,13 +849,20 @@ static void SavePassword(sqlite3* db) {
 }
 
 static std::string DecryptPassword(){
+    std::unique_ptr<unsigned char[], VirtualLockDeleter> seed, fixedIV, genKey;
     std::regex non_digits("[^0-9]");
     
     std::string input = std::regex_replace(currentPassword->GetCreationDatetime(), non_digits, "");
+    
+    try {
+        seed = AllocateLockedMemory<unsigned char>(KEY_SIZE);
+        fixedIV = AllocateLockedMemory<unsigned char>(IV_SIZE);
+        genKey = AllocateLockedMemory<unsigned char>(KEY_SIZE);
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
 
-    auto seed = std::make_unique<unsigned char[]>(KEY_SIZE);
-    auto fixedIV = std::make_unique<unsigned char[]>(IV_SIZE);
-    auto genKey = std::make_unique<unsigned char[]>(KEY_SIZE);
+        return "";
+    }
 
     key = EphemeralKeyStorage::RetrieveKey();
     LoadSeedAndIV(seedPath, seed.get(), KEY_SIZE, fixedIV.get(), IV_SIZE, key);
@@ -907,13 +921,21 @@ static void monitorKeyPress() {
                 std::this_thread::sleep_for(std::chrono::milliseconds(pasteTime));
             }
 
+            std::unique_ptr<unsigned char[], VirtualLockDeleter> seed, fixedIV, randomIV, genKey;
+            
             std::regex non_digits("[^0-9]");
             std::string input = std::regex_replace(currentPassword->GetCreationDatetime(), non_digits, "");
 
-            auto seed = std::make_unique<unsigned char[]>(KEY_SIZE);
-            auto fixedIV = std::make_unique<unsigned char[]>(IV_SIZE);
-            auto randomIV = std::make_unique<unsigned char[]>(IV_SIZE);
-            auto genKey = std::make_unique<unsigned char[]>(KEY_SIZE);
+            try{
+                seed = AllocateLockedMemory<unsigned char>(KEY_SIZE);
+                fixedIV = AllocateLockedMemory<unsigned char>(IV_SIZE);
+                randomIV = AllocateLockedMemory<unsigned char>(IV_SIZE);
+                genKey = AllocateLockedMemory<unsigned char>(KEY_SIZE);
+            } catch (const std::exception& e) {
+                std::cerr << "Error: " << e.what() << std::endl;
+
+                return;
+            }
 
             // Derive key from the seed and input
             key = EphemeralKeyStorage::RetrieveKey();

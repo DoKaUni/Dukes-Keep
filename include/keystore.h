@@ -45,3 +45,46 @@ public:
      */
     static void ClearKey();
 };
+
+struct VirtualLockDeleter {
+    void operator()(void* ptr) const {
+        if (ptr) {
+            SecureZeroMemory(ptr, size);
+            VirtualUnlock(ptr, size);
+            VirtualFree(ptr, 0, MEM_RELEASE);
+        }
+    }
+    size_t size;
+};
+
+/**
+ * Creates and locks a unique_ptr of the given data type and size using Windows' memory API.
+ *
+ * @param numElements The number of elements of type `T` to allocate memory for. The total allocated size will be `numElements * sizeof(T)`.
+ *
+ * @return allocated and locked unique_ptr of the given data type and size.
+ *
+ * @throws std::runtime_error If `VirtualAlloc` or `VirtualLock` fails.
+ */
+template <typename T>
+std::unique_ptr<T[], VirtualLockDeleter> AllocateLockedMemory(size_t numElements) {
+    const size_t bufferSize = numElements * sizeof(T);
+
+    // Allocate memory
+    void* buffer = VirtualAlloc(nullptr, bufferSize, MEM_COMMIT, PAGE_READWRITE);
+    if (!buffer) {
+        throw std::runtime_error("VirtualAlloc failed");
+    }
+
+    // Lock memory
+    if (!VirtualLock(buffer, bufferSize)) {
+        VirtualFree(buffer, 0, MEM_RELEASE);
+        throw std::runtime_error("VirtualLock failed");
+    }
+
+    // Return as unique_ptr with custom deleter
+    return std::unique_ptr<T[], VirtualLockDeleter>(
+        static_cast<T*>(buffer),
+        VirtualLockDeleter{bufferSize}
+    );
+}
