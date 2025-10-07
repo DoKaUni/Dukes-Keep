@@ -878,7 +878,28 @@ static std::string DecryptPassword(){
 
     DeriveKey(seed.get(), KEY_SIZE, input, genKey.get());
 
-    auto sectionState = std::make_unique<bool>(GenerateRandomBoolean(genKey.get(), fixedIV.get()));
+    seed.reset();
+
+    auto sectionState = std::unique_ptr<bool, VirtualLockDeleter>(
+        static_cast<bool*>(VirtualAlloc(nullptr, sizeof(bool), MEM_COMMIT, PAGE_READWRITE)),
+        VirtualLockDeleter{sizeof(bool)}
+    );
+    if (!sectionState) {
+        std::cerr << "Error: VirtualAlloc failed" << std::endl;
+
+        return "";
+    }
+    if (!VirtualLock(sectionState.get(), sizeof(bool))) {
+        VirtualFree(sectionState.release(), 0, MEM_RELEASE);
+        std::cerr << "Error: VirtualLock failed" << std::endl;
+
+        return "";
+    }
+    sectionState.get()[0] = GenerateRandomBoolean(genKey.get(), fixedIV.get());
+
+    genKey.reset();
+    fixedIV.reset();
+
     auto decryptedData = std::make_unique<std::vector<unsigned char>>();
 
     int fullLength = currentPassword->GetLength() * 2;
@@ -963,7 +984,22 @@ static void monitorKeyPress() {
 
             seed.reset();
 
-            auto sectionState = std::make_unique<bool>(GenerateRandomBoolean(genKey.get(), fixedIV.get()));
+            auto sectionState = std::unique_ptr<bool, VirtualLockDeleter>(
+                static_cast<bool*>(VirtualAlloc(nullptr, sizeof(bool), MEM_COMMIT, PAGE_READWRITE)),
+                VirtualLockDeleter{sizeof(bool)}
+            );
+            if (!sectionState) {
+                std::cerr << "Error: VirtualAlloc failed" << std::endl;
+
+                return;
+            }
+            if (!VirtualLock(sectionState.get(), sizeof(bool))) {
+                VirtualFree(sectionState.release(), 0, MEM_RELEASE);
+                std::cerr << "Error: VirtualLock failed" << std::endl;
+
+                return;
+            }
+            sectionState.get()[0] = GenerateRandomBoolean(genKey.get(), fixedIV.get());
 
             fixedIV.reset();
             
