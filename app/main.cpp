@@ -764,6 +764,7 @@ static void Authentication(ImGuiIO& io, const std::string& keyFile, const std::s
 static void SavePassword(sqlite3* db) {
     int userPasswordLength = passwordLengths[sectionLength - 2].at(entryWindowState.passwordLengthIndex);
     std::unique_ptr<unsigned char[], VirtualLockDeleter> randomIV, genKey;
+    std::unique_ptr<char[], VirtualLockDeleter> password;
 
     try {
         randomIV = AllocateLockedMemory<unsigned char>(IV_SIZE);
@@ -781,8 +782,14 @@ static void SavePassword(sqlite3* db) {
             characters += characterSets[i];
     }
 
-    auto password = std::make_unique<std::string>();
-    int fullLength = userPasswordLength*2;
+    int fullLength = userPasswordLength * 2;
+    try {
+        password = AllocateLockedMemory<char>(fullLength + 1);
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+
+        return;
+    }
 
     if(!GenerateRandomBytes(randomIV.get(), IV_SIZE))
         return;
@@ -795,11 +802,11 @@ static void SavePassword(sqlite3* db) {
     genKey.reset();
     randomIV.reset();
 
-    *password = GenerateRandomString(fullLength, characters);
+    GenerateRandomString(password.get(), fullLength, characters);
     std::vector<unsigned char> encryptedPassword;
 
     key = EphemeralKeyStorage::RetrieveKey();
-    EncryptData(StringToVector(*password), key, nullptr, encryptedPassword);
+    EncryptData(StringToVector(password.get()), key, nullptr, encryptedPassword);
     key.clear();
     
     password.reset();
@@ -850,11 +857,12 @@ static void SavePassword(sqlite3* db) {
 
 static std::string DecryptPassword(){
     std::unique_ptr<unsigned char[], VirtualLockDeleter> seed, fixedIV, genKey;
+    std::unique_ptr<char[], VirtualLockDeleter> password;
     std::regex non_digits("[^0-9]");
     
     std::string input = std::regex_replace(currentPassword->GetCreationDatetime(), non_digits, "");
     
-    try {
+    try{
         seed = AllocateLockedMemory<unsigned char>(KEY_SIZE);
         fixedIV = AllocateLockedMemory<unsigned char>(IV_SIZE);
         genKey = AllocateLockedMemory<unsigned char>(KEY_SIZE);
@@ -871,8 +879,16 @@ static std::string DecryptPassword(){
     DeriveKey(seed.get(), KEY_SIZE, input, genKey.get());
 
     auto sectionState = std::make_unique<bool>(GenerateRandomBoolean(genKey.get(), fixedIV.get()));
-    auto password = std::make_unique<std::string>();
     auto decryptedData = std::make_unique<std::vector<unsigned char>>();
+
+    int fullLength = currentPassword->GetLength() * 2;
+    try {
+        password = AllocateLockedMemory<char>(fullLength + 1);
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+
+        return "";
+    }
 
     key = EphemeralKeyStorage::RetrieveKey();
     if(!DecryptData(currentPassword->GetPassword(), key, *decryptedData)){
@@ -882,11 +898,11 @@ static std::string DecryptPassword(){
     }
     key.clear();
 
-    *password = VectorToString(*decryptedData);
+    VectorToBuffer(*decryptedData, password.get(), fullLength + 1);
 
     decryptedData.reset();
 
-    std::vector<PasswordSection> sections = SplitString(*password, currentPassword->GetIndexes(), sectionLength, sectionState.get());
+    std::vector<PasswordSection> sections = SplitString(password.get(), currentPassword->GetIndexes(), sectionLength, sectionState.get());
 
     password.reset();
     sectionState.reset();
@@ -922,6 +938,7 @@ static void monitorKeyPress() {
             }
 
             std::unique_ptr<unsigned char[], VirtualLockDeleter> seed, fixedIV, randomIV, genKey;
+            std::unique_ptr<char[], VirtualLockDeleter> password;
             
             std::regex non_digits("[^0-9]");
             std::string input = std::regex_replace(currentPassword->GetCreationDatetime(), non_digits, "");
@@ -950,8 +967,16 @@ static void monitorKeyPress() {
 
             fixedIV.reset();
             
-            auto password = std::make_unique<std::string>();
             auto decryptedData = std::make_unique<std::vector<unsigned char>>();
+
+            int fullLength = currentPassword->GetLength() * 2;
+            try {
+                password = AllocateLockedMemory<char>(fullLength + 1);
+            } catch (const std::exception& e) {
+                std::cerr << "Error: " << e.what() << std::endl;
+
+                return;
+            }
 
             key = EphemeralKeyStorage::RetrieveKey();
             if(!DecryptData(currentPassword->GetPassword(), key, *decryptedData)){
@@ -961,11 +986,11 @@ static void monitorKeyPress() {
             }
             key.clear();
             
-            *password = VectorToString(*decryptedData);
+            VectorToBuffer(*decryptedData, password.get(), fullLength + 1);
 
             decryptedData.reset();
 
-            std::vector<PasswordSection> sections = SplitString(*password, currentPassword->GetIndexes(), sectionLength, sectionState.get());
+            std::vector<PasswordSection> sections = SplitString(password.get(), currentPassword->GetIndexes(), sectionLength, sectionState.get());
 
             password.reset();
             sectionState.reset();

@@ -165,6 +165,11 @@ std::vector<unsigned char> StringToVector(const std::string& str) {
     return std::vector<unsigned char>(str.begin(), str.end());
 }
 
-std::string VectorToString(const std::vector<unsigned char>& vec) {
-    return std::string(vec.begin(), vec.end());
+void VectorToBuffer(const std::vector<unsigned char>& vec, char* buffer, size_t bufferSize) {
+    if (vec.size() > bufferSize - 1) {
+        throw std::runtime_error("Decrypted data too large for buffer");
+    }
+    
+    std::copy(vec.begin(), vec.end(), buffer);
+    buffer[vec.size()] = '\0';
 }

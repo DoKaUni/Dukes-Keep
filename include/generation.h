@@ -101,14 +101,14 @@ bool DeriveKey(const unsigned char* seed, int seedLength, const std::string& inp
 bool GenerateRandomBytesWithIV(const unsigned char* key, const unsigned char* iv, unsigned char* output, int outputLength);
 
 /**
- * Generates a random string using a specified character set.
+ * Generates a random string of chars into a buffer using a specified character set.
  * 
+ * @param buffer the char buffer to write the string char to.
  * @param outputLength The desired length of the generated string.
  * @param characterSet The set of characters to choose from when generating the string.
  * 
- * @return A random string of the specified length, or an empty string if an error occurred.
  */
-std::string GenerateRandomString(int outputLength, const std::string& characterSet);
+void GenerateRandomString(char* buffer, int outputLength, const std::string& characterSet);
 
 /**
  * Generates a random boolean value using a fixed key and IV, by generating a random byte and getting it's least significant bit.

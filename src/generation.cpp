@@ -167,23 +167,20 @@ bool GenerateRandomBytesWithIV(const unsigned char* key, const unsigned char* iv
     return true;
 }
 
-std::string GenerateRandomString(int outputLength, const std::string& characterSet) {
-    std::string randomString;
+void GenerateRandomString(char* buffer, int outputLength, const std::string& characterSet) {
     for (int i = 0; i < outputLength; ++i) {
-    unsigned char randomByte;
-    do {
-        if (RAND_bytes(&randomByte, 1) != 1) {
-            std::cerr << "Error generating random bytes." << std::endl;
-            
-            handleErrors();
-
-            return "";
-        }
-    } while (randomByte >= (256 / characterSet.length()) * characterSet.length());
-    randomString += characterSet[randomByte % characterSet.length()];
+        unsigned char randomByte;
+        do {
+            if (RAND_bytes(&randomByte, 1) != 1) {
+                std::cerr << "Error generating random bytes." << std::endl;
+                handleErrors();
+                return;
+            }
+        } while (randomByte >= (256 / characterSet.length()) * characterSet.length());
+        buffer[i] = characterSet[randomByte % characterSet.length()];
     }
-
-    return randomString;
+    
+    buffer[outputLength] = '\0'; // Null-terminate the string
 }
 
 bool GenerateRandomBoolean(const unsigned char* key, const unsigned char* fixedIV) {

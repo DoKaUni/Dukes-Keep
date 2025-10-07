@@ -69,9 +69,12 @@ bool DecryptData(const std::vector<unsigned char>& encryptedData, const std::vec
 std::vector<unsigned char> StringToVector(const std::string& str);
 
 /**
- * Converts a vector of unsigned chars to a string.
+ * Copies and converts a vector of unsigned chars to the given char buffer.
  * 
  * @param vec The vector of unsigned chars to convert.
- * @return A string containing the characters represented by the vector.
+ * @param buffer the char buffer to copy and convert to.
+ * @param bufferSize size of the buffer.
+ * 
+ * @throw std::runtime_error if the size of the vector is bigger than the given `bufferSize`.
  */
-std::string VectorToString(const std::vector<unsigned char>& vec);
+void VectorToBuffer(const std::vector<unsigned char>& vec, char* buffer, size_t bufferSize);
