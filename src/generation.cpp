@@ -1,5 +1,6 @@
 #include "generation.h"
 #include "encryption.h"
+#include "keystore.h"
 
 void handleErrors() {
     char errorBuffer[512];
@@ -40,33 +41,45 @@ bool SaveSeedAndIV(const std::string& seedPath, const unsigned char* seed, int s
     return WriteFile(seedPath, encryptedData);
 }
 
-bool LoadSeedAndIV(const std::string& seedPath, unsigned char* seed, int seedLength, unsigned char* fixedIV, int ivLength, const std::vector<unsigned char>& key) 
-{
+bool LoadSeedAndIV(const std::string& seedPath, unsigned char* seed, int seedLength, unsigned char* fixedIV, int ivLength, const std::vector<unsigned char>& key) {
+    std::unique_ptr<unsigned char[], VirtualLockDeleter> seedIvData;
     std::vector<unsigned char> encryptedData;
+
     if (!ReadFile(seedPath, encryptedData)) {
         // File doesn't exist, generate new seed and IV
         std::cerr << "Seed file not found. Generating new seed and IV." << std::endl;
         GenerateRandomBytes(seed, seedLength);
         GenerateRandomBytes(fixedIV, ivLength);
+
         return SaveSeedAndIV(seedPath, seed, seedLength, fixedIV, ivLength, key);
     }
 
+    try {
+        seedIvData = AllocateLockedMemory<unsigned char>(seedLength + ivLength);
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+
+        return false;
+    }
+
     // Decrypt the data
-    std::vector<unsigned char> seedIvData;
-    if (!DecryptData(encryptedData, key, seedIvData)) {
+    size_t decryptedSize;
+    if (!DecryptData(encryptedData, key, seedIvData.get(), decryptedSize)) {
         std::cerr << "Failed to decrypt seed file." << std::endl;
+
         return false;
     }
 
     // Verify we got enough data
-    if (seedIvData.size() != static_cast<size_t>(seedLength + ivLength)) {
+    if (decryptedSize != static_cast<size_t>(seedLength + ivLength)) {
         std::cerr << "Invalid seed file contents." << std::endl;
+        
         return false;
     }
 
     // Split back into seed and IV
-    std::copy(seedIvData.begin(), seedIvData.begin() + seedLength, seed);
-    std::copy(seedIvData.begin() + seedLength, seedIvData.end(), fixedIV);
+    std::copy(seedIvData.get(), seedIvData.get() + seedLength, seed);
+    std::copy(seedIvData.get() + seedLength, seedIvData.get() + seedLength + ivLength, fixedIV);
 
     return true;
 }

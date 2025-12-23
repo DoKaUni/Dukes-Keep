@@ -101,7 +101,7 @@ bool EncryptData(const std::vector<unsigned char>& data, const std::vector<unsig
     return true;
 }
 
-bool DecryptData(const std::vector<unsigned char>& encryptedData, const std::vector<unsigned char>& key, std::vector<unsigned char>& outDecryptedData) {
+bool DecryptData(const std::vector<unsigned char>& encryptedData, const std::vector<unsigned char>& key, unsigned char* outDecryptedData, size_t& outDecryptedSize) {
     if (encryptedData.size() < 1 + EVP_MAX_IV_LENGTH) {
         std::cerr << "Invalid encrypted data format." << std::endl;
 
@@ -125,37 +125,32 @@ bool DecryptData(const std::vector<unsigned char>& encryptedData, const std::vec
     EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {
         handleErrors();
-        
         return false;
     }
 
     if (EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key.data(), iv.data()) != 1) {
         handleErrors();
         EVP_CIPHER_CTX_free(ctx);
-
         return false;
     }
 
-    outDecryptedData.resize(ciphertext.size() + EVP_MAX_BLOCK_LENGTH);
     int length, plaintextLength;
 
-    if (EVP_DecryptUpdate(ctx, outDecryptedData.data(), &length, ciphertext.data(), ciphertext.size()) != 1) {
+    if (EVP_DecryptUpdate(ctx, outDecryptedData, &length, ciphertext.data(), ciphertext.size()) != 1) {
         handleErrors();
         EVP_CIPHER_CTX_free(ctx);
-
         return false;
     }
     plaintextLength = length;
 
-    if (EVP_DecryptFinal_ex(ctx, outDecryptedData.data() + length, &length) != 1) {
+    if (EVP_DecryptFinal_ex(ctx, outDecryptedData + length, &length) != 1) {
         handleErrors();
         EVP_CIPHER_CTX_free(ctx);
-
         return false;
     }
     plaintextLength += length;
 
-    outDecryptedData.resize(plaintextLength);
+    outDecryptedSize = plaintextLength;
     EVP_CIPHER_CTX_free(ctx);
 
     return true;
@@ -170,6 +165,6 @@ void VectorToBuffer(const std::vector<unsigned char>& vec, char* buffer, size_t 
         throw std::runtime_error("Decrypted data too large for buffer");
     }
     
-    std::copy(vec.begin(), vec.end(), buffer);
+    std::copy(vec.begin(), vec.end(), reinterpret_cast<unsigned char*>(buffer));
     buffer[vec.size()] = '\0';
 }

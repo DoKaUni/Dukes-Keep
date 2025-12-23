@@ -50,15 +50,17 @@ bool DerivePasswordKey(const std::string& password, const unsigned char* salt, s
  */
 bool EncryptData(const std::vector<unsigned char>& data, const std::vector<unsigned char>& key, const unsigned char* salt, std::vector<unsigned char>& outEncryptedData);
 
-/**
+ /**
  * Decrypts encrypted data using AES-256-CBC decryption with the provided key.
- * 
+ *
  * @param encryptedData A vector of unsigned chars representing the encrypted data (including header, salt, IV, and ciphertext).
  * @param key A vector of unsigned chars representing the decryption key.
- * @param outDecryptedData A reference to a vector that will hold the decrypted data.
+ * @param outDecryptedData A pointer to a locked buffer where the decrypted data will be written.
+ * @param outDecryptedSize A reference to a size_t that will hold the size of the decrypted data.
+ *
  * @return True if the data was successfully decrypted; false if an error occurred or the data format is invalid.
  */
-bool DecryptData(const std::vector<unsigned char>& encryptedData, const std::vector<unsigned char>& key, std::vector<unsigned char>& outDecryptedData);
+bool DecryptData(const std::vector<unsigned char>& encryptedData, const std::vector<unsigned char>& key, unsigned char* outDecryptedData, size_t& outDecryptedSize);
 
 /**
  * Converts a string to a vector of unsigned chars.
