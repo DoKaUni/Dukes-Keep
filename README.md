@@ -21,11 +21,11 @@ You can view the current releases on the [releases page](https://github.com/DoKa
 ### Anti Spyware/Keylogger features
 * Password 'fake' sections (Memory scraping countermeasure)
 * Application specific on-screen keyboard (Keylogger countermeasure)
+* Sensitive information is locked to memory, not swappable (Memory scraping countermeasure)
 * Randomized automatic copy and pasting with fake sections (Clipboard logger countermeasure)
 * Copying or automatically pasting your password without seeing it (Screen-recording spyware countermeasure)
 
 ## In development
-* Make sensitive information locked to memory (no swap)
 * More robust error-handling
 * Better UX (informing the user of invalid inputs, errors)
 * Unit tests

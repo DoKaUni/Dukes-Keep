@@ -34,33 +34,33 @@ bool WriteFile(const std::string& filename, const std::vector<unsigned char>& da
  * 
  * @param password The password to derive the key from.
  * @param salt A pointer to the salt used for the key derivation.
- * @param outKey A reference to a vector that will hold the derived key.
+ * @param outKey A buffer that will store the derived key.
  * @return True if the key was successfully derived; false if an error occurred.
  */
-bool DerivePasswordKey(const std::string& password, const unsigned char* salt, std::vector<unsigned char>& outKey);
+bool DerivePasswordKey(const std::string& password, const unsigned char* salt, unsigned char* outKey);
 
 /**
  * Encrypts data using AES-256-CBC encryption with a provided key and an optional salt.
  * 
  * @param data A vector of unsigned chars representing the data to encrypt.
- * @param key A vector of unsigned chars representing the encryption key.
+ * @param key A buffer storing the encryption key.
  * @param salt A pointer to the salt to use (can be nullptr).
  * @param outEncryptedData A reference to a vector that will hold the encrypted data, including the header, salt, IV, and ciphertext.
  * @return True if the data was successfully encrypted; false if an error occurred.
  */
-bool EncryptData(const std::vector<unsigned char>& data, const std::vector<unsigned char>& key, const unsigned char* salt, std::vector<unsigned char>& outEncryptedData);
+bool EncryptData(const std::vector<unsigned char>& data, const unsigned char* key, const unsigned char* salt, std::vector<unsigned char>& outEncryptedData);
 
  /**
  * Decrypts encrypted data using AES-256-CBC decryption with the provided key.
  *
  * @param encryptedData A vector of unsigned chars representing the encrypted data (including header, salt, IV, and ciphertext).
- * @param key A vector of unsigned chars representing the decryption key.
+ * @param key A buffer storing the encryption key.
  * @param outDecryptedData A pointer to a locked buffer where the decrypted data will be written.
  * @param outDecryptedSize A reference to a size_t that will hold the size of the decrypted data.
  *
  * @return True if the data was successfully decrypted; false if an error occurred or the data format is invalid.
  */
-bool DecryptData(const std::vector<unsigned char>& encryptedData, const std::vector<unsigned char>& key, unsigned char* outDecryptedData, size_t& outDecryptedSize);
+bool DecryptData(const std::vector<unsigned char>& encryptedData, const unsigned char* key, unsigned char* outDecryptedData, size_t& outDecryptedSize);
 
 /**
  * Converts a string to a vector of unsigned chars.

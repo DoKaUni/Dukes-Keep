@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <windows.h>
+#include <algorithm>
 #include <dpapi.h>
 #include <vector>
 #include <string>
@@ -34,11 +35,12 @@ public:
     /**
      * Retrieves the stored encryption key by decrypting it using Windows DPAPI.
      * 
-     * @return The decrypted key as a vector of unsigned characters.
+     * @param lockedBuffer A buffer that will store the retrieved key.
+     * @param bufferSize The size of the buffer.
      * 
-     * @throws std::runtime_error If no key is stored or if the decryption operation fails.
+     * @throws std::runtime_error If no key is stored, if the decryption operation fails or the data is decrypted data is too large for the buffer.
      */
-    static std::vector<unsigned char> RetrieveKey();
+    static void RetrieveKey(unsigned char* lockedBuffer, size_t bufferSize);
 
     /**
      * Securely clears the stored encryption key from memory by zeroing out the storage.

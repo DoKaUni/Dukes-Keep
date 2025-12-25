@@ -20,7 +20,7 @@ bool GenerateRandomBytes(unsigned char* buffer, int length) {
     return true;
 }
 
-bool SaveSeedAndIV(const std::string& seedPath, const unsigned char* seed, int seedLength, const unsigned char* fixedIV, int ivLength,const std::vector<unsigned char>& key) 
+bool SaveSeedAndIV(const std::string& seedPath, const unsigned char* seed, int seedLength, const unsigned char* fixedIV, int ivLength, const unsigned char* key) 
 {
     // Combine seed and IV into a single buffer
     std::vector<unsigned char> seedIvData(seedLength + ivLength);
@@ -41,7 +41,7 @@ bool SaveSeedAndIV(const std::string& seedPath, const unsigned char* seed, int s
     return WriteFile(seedPath, encryptedData);
 }
 
-bool LoadSeedAndIV(const std::string& seedPath, unsigned char* seed, int seedLength, unsigned char* fixedIV, int ivLength, const std::vector<unsigned char>& key) {
+bool LoadSeedAndIV(const std::string& seedPath, unsigned char* seed, int seedLength, unsigned char* fixedIV, int ivLength, const unsigned char* key) {
     std::unique_ptr<unsigned char[], VirtualLockDeleter> seedIvData;
     std::vector<unsigned char> encryptedData;
 

@@ -115,7 +115,7 @@ static int sectionLength{};
 static std::string shortcutKeyName{};
 static bool capturingKey = false;
 
-static std::vector<unsigned char> key;
+static std::unique_ptr<unsigned char[], VirtualLockDeleter> key;
 static std::string settingsFile{};
 static std::string seedPath{};
 static const float windowScale = 1.5f;
@@ -596,13 +596,15 @@ static std::string GetKeyName(int vkCode) {
 
 static bool HandleLogin(const std::string& keyFile, const std::string& dbFile, sqlite3*& db, const std::string& passwordInput, const bool firstRun, bool& wrongPassword) {
     if (firstRun) {
-        key.resize(KEY_SIZE);
-        if(!GenerateRandomBytes(key.data(), KEY_SIZE)){
+        std::vector<unsigned char> newKey;
+
+        newKey.resize(KEY_SIZE);
+        if(!GenerateRandomBytes(newKey.data(), KEY_SIZE)){
             return false;
         }
 
         try{
-            EphemeralKeyStorage::StoreKey(key);
+            EphemeralKeyStorage::StoreKey(newKey);
         } catch (const std::exception& e) {
             std::cerr << "Error: " << e.what() << std::endl;
 
@@ -617,12 +619,14 @@ static bool HandleLogin(const std::string& keyFile, const std::string& dbFile, s
         std::vector<unsigned char> derivedKey;
         std::vector<unsigned char> encryptedData;
 
-        DerivePasswordKey(passwordInput, salt, derivedKey);
-        EncryptData(key, derivedKey, salt, encryptedData);
+        derivedKey.resize(KEY_SIZE);
+
+        DerivePasswordKey(passwordInput, salt, derivedKey.data());
+        EncryptData(newKey, derivedKey.data(), salt, encryptedData);
         WriteFile(keyFile, encryptedData);
         
         bool db_exists = std::filesystem::exists(dbFile);
-        if (!OpenDatabase(&db, dbFile.c_str(), key, db_exists))
+        if (!OpenDatabase(&db, dbFile.c_str(), newKey, db_exists))
             return false;
 
         if (!InitializeDatabase(db)) {
@@ -631,11 +635,11 @@ static bool HandleLogin(const std::string& keyFile, const std::string& dbFile, s
             return false;
         }
 
-        key.clear();
+        newKey.clear();
         
         return true;
     } else {
-        std::unique_ptr<unsigned char[], VirtualLockDeleter> decryptedKey;
+        std::unique_ptr<unsigned char[], VirtualLockDeleter> decryptedKey, derivedKey;
         std::vector<unsigned char> encryptedData;
         ReadFile(keyFile, encryptedData);
         unsigned char header = encryptedData[0];
@@ -647,8 +651,13 @@ static bool HandleLogin(const std::string& keyFile, const std::string& dbFile, s
             std::copy(encryptedData.begin() + 1, encryptedData.begin() + 1 + SALT_SIZE, salt);
         }
 
-        std::vector<unsigned char> derivedKey;
-        DerivePasswordKey(passwordInput, salt, derivedKey);
+        try {
+            derivedKey = AllocateLockedMemory<unsigned char>(KEY_SIZE);
+        } catch (const std::exception& e) {
+            std::cerr << "Error: " << e.what() << std::endl;
+
+            return false;
+        }
 
         try {
             decryptedKey = AllocateLockedMemory<unsigned char>(KEY_SIZE);
@@ -657,8 +666,9 @@ static bool HandleLogin(const std::string& keyFile, const std::string& dbFile, s
 
             return false;
         }
+        DerivePasswordKey(passwordInput, salt, derivedKey.get());
 
-        if (!DecryptData(encryptedData, derivedKey, decryptedKey.get(), decryptedSize)) {
+        if (!DecryptData(encryptedData, derivedKey.get(), decryptedKey.get(), decryptedSize)) {
             wrongPassword = true;
 
             return false;
@@ -813,9 +823,12 @@ static void SavePassword(sqlite3* db) {
     GenerateRandomString(password.get(), fullLength, characters);
     std::vector<unsigned char> encryptedPassword;
 
-    key = EphemeralKeyStorage::RetrieveKey();
-    EncryptData(StringToVector(password.get()), key, nullptr, encryptedPassword);
-    key.clear();
+    key = AllocateLockedMemory<unsigned char>(KEY_SIZE);
+    EphemeralKeyStorage::RetrieveKey(key.get(), KEY_SIZE);
+
+    EncryptData(StringToVector(password.get()), key.get(), nullptr, encryptedPassword);
+    
+    key.reset();
     
     password.reset();
     
@@ -881,9 +894,12 @@ static std::string DecryptPassword(){
         return "";
     }
 
-    key = EphemeralKeyStorage::RetrieveKey();
-    LoadSeedAndIV(seedPath, seed.get(), KEY_SIZE, fixedIV.get(), IV_SIZE, key);
-    key.clear();
+    key = AllocateLockedMemory<unsigned char>(KEY_SIZE);
+    EphemeralKeyStorage::RetrieveKey(key.get(), KEY_SIZE);
+
+    LoadSeedAndIV(seedPath, seed.get(), KEY_SIZE, fixedIV.get(), IV_SIZE, key.get());
+
+    key.reset();
 
     DeriveKey(seed.get(), KEY_SIZE, input, genKey.get());
 
@@ -925,11 +941,15 @@ static std::string DecryptPassword(){
         return "";
     }
 
-    key = EphemeralKeyStorage::RetrieveKey();
-    if(!DecryptData(currentPassword->GetPassword(), key, decryptedData.get(), decryptedSize)){
+    key = AllocateLockedMemory<unsigned char>(KEY_SIZE);
+    EphemeralKeyStorage::RetrieveKey(key.get(), KEY_SIZE);
+
+    if(!DecryptData(currentPassword->GetPassword(), key.get(), decryptedData.get(), decryptedSize)){
         std::cerr << "Password decryption failed" << std::endl;
         return "";
     }
+
+    key.reset();
 
     VectorToBuffer(std::vector<unsigned char>(decryptedData.get(), decryptedData.get() + decryptedSize), password.get(), fullLength + 1);
 
@@ -989,9 +1009,12 @@ static void monitorKeyPress() {
             }
 
             // Derive key from the seed and input
-            key = EphemeralKeyStorage::RetrieveKey();
-            LoadSeedAndIV(seedPath, seed.get(), KEY_SIZE, fixedIV.get(), IV_SIZE, key);
-            key.clear();
+            key = AllocateLockedMemory<unsigned char>(KEY_SIZE);
+            EphemeralKeyStorage::RetrieveKey(key.get(), KEY_SIZE);
+
+            LoadSeedAndIV(seedPath, seed.get(), KEY_SIZE, fixedIV.get(), IV_SIZE, key.get());
+
+            key.reset();
 
             DeriveKey(seed.get(), KEY_SIZE, input, genKey.get());
 
@@ -1032,12 +1055,15 @@ static void monitorKeyPress() {
                 return;
             }
 
-            key = EphemeralKeyStorage::RetrieveKey();
-            if(!DecryptData(currentPassword->GetPassword(), key, decryptedData.get(), decryptedSize)){
+            key = AllocateLockedMemory<unsigned char>(KEY_SIZE);
+            EphemeralKeyStorage::RetrieveKey(key.get(), KEY_SIZE);
+
+            if(!DecryptData(currentPassword->GetPassword(), key.get(), decryptedData.get(), decryptedSize)){
                 std::cerr << "Password decryption failed" << std::endl;
                 return;
             }
-            key.clear();
+
+            key.reset();
             
             VectorToBuffer(std::vector<unsigned char>(decryptedData.get(), decryptedData.get() + decryptedSize), password.get(), fullLength + 1);
 

@@ -41,7 +41,7 @@ void EphemeralKeyStorage::StoreKey(const std::vector<unsigned char>& key) {
     LocalFree(dataOut.pbData);
 }
 
-std::vector<unsigned char> EphemeralKeyStorage::RetrieveKey() {
+void EphemeralKeyStorage::RetrieveKey(unsigned char* lockedBuffer, size_t bufferSize) {
     std::lock_guard<std::mutex> lock(mutex);
     if (encryptedKey.empty()) {
         throw std::runtime_error("No key stored");
@@ -61,10 +61,15 @@ std::vector<unsigned char> EphemeralKeyStorage::RetrieveKey() {
         throw std::runtime_error("CryptUnprotectData failed. Error: " + std::to_string(GetLastError()));
     }
 
-    std::vector<unsigned char> result(dataOut.pbData, dataOut.pbData + dataOut.cbData);
-    LocalFree(dataOut.pbData);
+    if (dataOut.cbData > bufferSize) {
+        LocalFree(dataOut.pbData);
+        
+        throw std::runtime_error("Buffer too small for decrypted key");
+    }
 
-    return result;
+    std::copy_n(dataOut.pbData, dataOut.cbData, lockedBuffer);
+    SecureZeroMemory(dataOut.pbData, dataOut.cbData);
+    LocalFree(dataOut.pbData);
 }
 
 void EphemeralKeyStorage::ClearKey() {

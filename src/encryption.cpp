@@ -29,10 +29,8 @@ bool WriteFile(const std::string& filename, const std::vector<unsigned char>& da
     return outFile.good();
 }
 
-bool DerivePasswordKey(const std::string& password, const unsigned char* salt, std::vector<unsigned char>& outKey) {
-    outKey.resize(KEY_SIZE);
-
-    if (PKCS5_PBKDF2_HMAC(password.c_str(), password.length(), salt, SALT_SIZE, ITERATIONS, EVP_sha256(), KEY_SIZE, outKey.data()) != 1) {
+bool DerivePasswordKey(const std::string& password, const unsigned char* salt,  unsigned char* outKey) {
+    if (PKCS5_PBKDF2_HMAC(password.c_str(), password.length(), salt, SALT_SIZE, ITERATIONS, EVP_sha256(), KEY_SIZE, outKey) != 1) {
         handleErrors();
 
         return false;
@@ -41,26 +39,22 @@ bool DerivePasswordKey(const std::string& password, const unsigned char* salt, s
     return true;
 }
 
-bool EncryptData(const std::vector<unsigned char>& data, const std::vector<unsigned char>& key, const unsigned char* salt, std::vector<unsigned char>& outEncryptedData) {
+bool EncryptData(const std::vector<unsigned char>& data, const unsigned char* key, const unsigned char* salt, std::vector<unsigned char>& outEncryptedData) {
     std::vector<unsigned char> iv(EVP_MAX_IV_LENGTH);
-
     if (RAND_bytes(iv.data(), EVP_MAX_IV_LENGTH) != 1) {
         handleErrors();
-
         return false;
     }
 
     EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {
         handleErrors();
-
         return false;
     }
 
-    if (EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key.data(), iv.data()) != 1) {
+    if (EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv.data()) != 1) {
         handleErrors();
         EVP_CIPHER_CTX_free(ctx);
-
         return false;
     }
 
@@ -70,7 +64,6 @@ bool EncryptData(const std::vector<unsigned char>& data, const std::vector<unsig
     if (EVP_EncryptUpdate(ctx, ciphertext.data(), &length, data.data(), data.size()) != 1) {
         handleErrors();
         EVP_CIPHER_CTX_free(ctx);
-
         return false;
     }
 
@@ -79,13 +72,13 @@ bool EncryptData(const std::vector<unsigned char>& data, const std::vector<unsig
     if (EVP_EncryptFinal_ex(ctx, ciphertext.data() + length, &length) != 1) {
         handleErrors();
         EVP_CIPHER_CTX_free(ctx);
-
         return false;
     }
 
     ciphertextLength += length;
     ciphertext.resize(ciphertextLength);
     EVP_CIPHER_CTX_free(ctx);
+
 
     // Combine header, salt (if provided), IV, and ciphertext
     outEncryptedData.clear();
@@ -94,14 +87,14 @@ bool EncryptData(const std::vector<unsigned char>& data, const std::vector<unsig
 
     if (salt)
         outEncryptedData.insert(outEncryptedData.end(), salt, salt + SALT_SIZE);
-        
+
     outEncryptedData.insert(outEncryptedData.end(), iv.begin(), iv.end());
     outEncryptedData.insert(outEncryptedData.end(), ciphertext.begin(), ciphertext.end());
 
     return true;
 }
 
-bool DecryptData(const std::vector<unsigned char>& encryptedData, const std::vector<unsigned char>& key, unsigned char* outDecryptedData, size_t& outDecryptedSize) {
+bool DecryptData(const std::vector<unsigned char>& encryptedData, const unsigned char* key, unsigned char* outDecryptedData, size_t& outDecryptedSize) {
     if (encryptedData.size() < 1 + EVP_MAX_IV_LENGTH) {
         std::cerr << "Invalid encrypted data format." << std::endl;
 
@@ -128,7 +121,7 @@ bool DecryptData(const std::vector<unsigned char>& encryptedData, const std::vec
         return false;
     }
 
-    if (EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key.data(), iv.data()) != 1) {
+    if (EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv.data()) != 1) {
         handleErrors();
         EVP_CIPHER_CTX_free(ctx);
         return false;
