@@ -161,6 +161,16 @@ std::vector<PasswordEntry> GetAllPasswords(sqlite3 *db);
 bool PurgeDeletedPasswords(sqlite3* db);
 
 /**
+ * Marks all the passwords that are found to be older than the `replacementInterval` (days)
+ * 
+ * @param db The SQLite database connection.
+ * @param replacementInterval 
+ * 
+ * @return True if passwords were marked, false otherwise.
+ */
+bool MarkReplacementNotifications(sqlite3* db, int replacementInterval);
+
+/**
  * Retrieves all tags from the database.
  * 
  * @param db The SQLite database connection.

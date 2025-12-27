@@ -112,6 +112,8 @@ static int listenTime{};
 static int showPasswordTime{};
 static int shortcutKey{};
 static int sectionLength{};
+static int passwordChangeInterval{};
+static int deletedPasswordKeepTime{};
 static std::string shortcutKeyName{};
 static bool capturingKey = false;
 
@@ -133,13 +135,15 @@ const int defaultListenTime = 5;
 const int defaultShowPasswordTime = 10;
 const int defaultShortcutKey = 0xDC; // '\' key
 const int defaultSectionLength = 4;
+const int defaultPasswordChangeInterval = 30;
+const int defaultDeletedPasswordKeepTime = 7;
 
 // Initialization & Setup Functions
 static std::string WStringToString(const std::wstring& wstr);
 static void InitializeDefaultTabs();
 static void LoadSettings();
-static void SaveSettings(int pasteTime, int listenTime, int showPasswordTime, int shortcutKey, int sectionLength);
-static void SettingsCheck(int& pasteTime, int& listenTime, int& showPasswordTime, int& shortcutKey, int& sectionLength);
+static void SaveSettings(int pasteTime, int listenTime, int showPasswordTime, int shortcutKey, int sectionLength, int passwordChangeInterval, int deletedPasswordKeepTime);
+static void SettingsCheck(int& pasteTime, int& listenTime, int& showPasswordTime, int& shortcutKey, int& sectionLength, int& passwordChangeInterval, int& deletedPasswordKeepTime);
 static std::string GetKeyName(int vkCode);
 
 // Authentication Functions
@@ -434,15 +438,15 @@ static void InitializeDefaultTabs() {
 }
 
 static void LoadSettings() {
-    SettingsCheck(pasteTime, listenTime, showPasswordTime, shortcutKey, sectionLength);
+    SettingsCheck(pasteTime, listenTime, showPasswordTime, shortcutKey, sectionLength, passwordChangeInterval, deletedPasswordKeepTime);
 
-    SaveSettings(pasteTime, listenTime, showPasswordTime, shortcutKey, sectionLength);
+    SaveSettings(pasteTime, listenTime, showPasswordTime, shortcutKey, sectionLength, passwordChangeInterval, deletedPasswordKeepTime);
     
     // Update the key name display
     shortcutKeyName = GetKeyName(shortcutKey);
 }
 
-static void SaveSettings(int pasteTime, int listenTime, int showPasswordTime, int shortcutKey, int sectionLength) {
+static void SaveSettings(int pasteTime, int listenTime, int showPasswordTime, int shortcutKey, int sectionLength, int passwordChangeInterval, int deletedPasswordKeepTime) {
     std::filesystem::path path(settingsFile);
     if (!path.parent_path().empty()) {
         std::filesystem::create_directories(path.parent_path());
@@ -453,14 +457,18 @@ static void SaveSettings(int pasteTime, int listenTime, int showPasswordTime, in
     WritePrivateProfileStringA("Settings", "ShowPasswordTime", std::to_string(showPasswordTime).c_str(), settingsFile.c_str());
     WritePrivateProfileStringA("Settings", "ShortcutKey", std::to_string(shortcutKey).c_str(), settingsFile.c_str());
     WritePrivateProfileStringA("Settings", "SectionLength", std::to_string(sectionLength).c_str(), settingsFile.c_str());
+    WritePrivateProfileStringA("Settings", "PasswordChangeInterval", std::to_string(passwordChangeInterval).c_str(), settingsFile.c_str());
+    WritePrivateProfileStringA("Settings", "DeletedPasswordKeepTime", std::to_string(deletedPasswordKeepTime).c_str(), settingsFile.c_str());
 }
 
-static void SettingsCheck(int& pasteTime, int& listenTime, int& showPasswordTime, int& shortcutKey, int& sectionLength) {
+static void SettingsCheck(int& pasteTime, int& listenTime, int& showPasswordTime, int& shortcutKey, int& sectionLength, int& passwordChangeInterval, int& deletedPasswordKeepTime) {
     int tempPasteTime = pasteTime;
     int tempListenTime = listenTime;
     int tempShowPasswordTime = showPasswordTime;
     int tempShortcutKey = shortcutKey;
     int tempSectionLength = sectionLength;
+    int tempPasswordChangeInterval = passwordChangeInterval;
+    int tempDeletedPasswordKeepTime = deletedPasswordKeepTime;
     
     // Read values from INI file
     tempPasteTime = GetPrivateProfileIntA("Settings", "PasteTime", tempPasteTime, settingsFile.c_str());
@@ -468,6 +476,8 @@ static void SettingsCheck(int& pasteTime, int& listenTime, int& showPasswordTime
     tempShowPasswordTime = GetPrivateProfileIntA("Settings", "ShowPasswordTime", tempShowPasswordTime, settingsFile.c_str());
     tempShortcutKey = GetPrivateProfileIntA("Settings", "ShortcutKey", tempShortcutKey, settingsFile.c_str());
     tempSectionLength = GetPrivateProfileIntA("Settings", "SectionLength", tempSectionLength, settingsFile.c_str());
+    tempPasswordChangeInterval = GetPrivateProfileIntA("Settings", "PasswordChangeInterval", tempPasswordChangeInterval, settingsFile.c_str());
+    tempDeletedPasswordKeepTime = GetPrivateProfileIntA("Settings", "DeletedPasswordKeepTime", tempDeletedPasswordKeepTime, settingsFile.c_str());
     
     // Validate pasteTime (must be positive integer)
     pasteTime = (tempPasteTime > 0 && tempPasteTime <= INT_MAX) ? tempPasteTime : defaultPasteTime;
@@ -484,6 +494,12 @@ static void SettingsCheck(int& pasteTime, int& listenTime, int& showPasswordTime
     
     // Validate sectionLength (must be between 2 and 8)
     sectionLength = (tempSectionLength >= sectionLengths[0] && tempSectionLength <= sizeof(sectionLengths) - 1) ? tempSectionLength : defaultSectionLength;
+
+    // Validate passwordChangeInterval (must be positive integer and not more than 365)
+    passwordChangeInterval = (tempPasswordChangeInterval > 0 && tempPasswordChangeInterval <= 365) ? tempPasswordChangeInterval : defaultPasswordChangeInterval;
+
+    // Validate deletedPasswordKeepTime (must be positive integer and not more than 30)
+    deletedPasswordKeepTime = (tempDeletedPasswordKeepTime >= 0 && tempDeletedPasswordKeepTime <= 30) ? tempDeletedPasswordKeepTime : defaultDeletedPasswordKeepTime;
 }
 
 static std::string GetKeyName(int vkCode) {
@@ -754,14 +770,15 @@ static void Authentication(ImGuiIO& io, const std::string& keyFile, const std::s
         }
 
         if(result){
-            PurgeDeletedPasswords(db);
-            passwords = GetAllPasswords(db);
-            InitializeDefaultTabs();
-
             if(firstRun)
-                SaveSettings(defaultPasteTime, defaultListenTime, defaultShowPasswordTime, defaultShortcutKey, sectionLengths[sectionLengthIndex]);
+                SaveSettings(defaultPasteTime, defaultListenTime, defaultShowPasswordTime, defaultShortcutKey, sectionLengths[sectionLengthIndex], defaultPasswordChangeInterval, defaultDeletedPasswordKeepTime);
 
             LoadSettings();
+
+            PurgeDeletedPasswords(db);
+            MarkReplacementNotifications(db, passwordChangeInterval);
+            passwords = GetAllPasswords(db);
+            InitializeDefaultTabs();
         }
         
         ImGui::End();
@@ -1322,12 +1339,31 @@ static void RenderManagerTab(ManagerTab& tab, sqlite3* db) {
     for (int i = 0; i < filteredPasswords.size(); i++) {
         ImGui::PushID(filteredPasswords[i]->GetId());
         bool isSelected = (tab.selectedItem == i);
+
+        if (filteredPasswords[i]->GetGotReplacementNotification()) {
+            ImVec2 min = ImGui::GetCursorScreenPos();
+            ImVec2 max = ImVec2(min.x + ImGui::GetContentRegionAvail().x, min.y + ImGui::GetFrameHeight());
+            ImGui::GetWindowDrawList()->AddRectFilled(min, max, IM_COL32(255, 100, 100, 217));
+
+            // Push all relevant style colors for Selectable
+            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 255));
+            ImGui::PushStyleColor(ImGuiCol_Header, IM_COL32(255, 100, 100, 217)); // Default background
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, IM_COL32(255, 90, 90, 255)); // Hovered
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, IM_COL32(255, 75, 75, 255)); // Active (clicked)
+        }
+
         if (ImGui::Selectable(filteredPasswords[i]->GetName().c_str(), isSelected)) {
             tab.selectedItem = i;
         }
+
+        if (filteredPasswords[i]->GetGotReplacementNotification()) {
+            ImGui::PopStyleColor(4);
+        }
+
         ImGui::PopID();
     }
     ImGui::EndChild();
+
 
     // Entry actions
     if (tab.selectedItem != -1 && tab.selectedItem < filteredPasswords.size()) {
@@ -1485,6 +1521,8 @@ static void RenderSettingsWindow() {
     static int tempShowPasswordTime;
     static int tempShortcutKey;
     static std::string tempShortcutKeyName;
+    static int tempPasswordChangeInterval;
+    static int tempDeletedPasswordKeepTime;
 
     if (firstOpen && showSettingsWindow) {
         tempPasteTime = pasteTime;
@@ -1492,6 +1530,8 @@ static void RenderSettingsWindow() {
         tempShowPasswordTime = showPasswordTime;
         tempShortcutKey = shortcutKey;
         tempShortcutKeyName = shortcutKeyName;
+        tempPasswordChangeInterval = passwordChangeInterval;
+        tempDeletedPasswordKeepTime = deletedPasswordKeepTime;
 
         firstOpen = false;
     }
@@ -1559,14 +1599,36 @@ static void RenderSettingsWindow() {
             }
         }
 
+        ImGui::Text("Password change interval (Days):");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(100);
+        ImGui::InputInt("##PasswordChangeInterval", &tempPasswordChangeInterval, 1, 1);
+        if (tempPasswordChangeInterval < 1 || tempPasswordChangeInterval > 365)
+            tempPasswordChangeInterval = 1;
+
+        ImGui::Text("Deleted password keep time (Days):");
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::Text("Passwords that have been marked for deletion for this amount of days will be deleted upon startup.");
+            ImGui::Text("If set to 0, deletion marked passwords will always be deleted on next startup.");
+            ImGui::EndTooltip();
+        }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(100);
+        ImGui::InputInt("##DeletedPasswordKeepTime", &tempDeletedPasswordKeepTime, 1, 1);
+        if (tempDeletedPasswordKeepTime < 0 || tempDeletedPasswordKeepTime > 30)
+            tempDeletedPasswordKeepTime = 0;
+
         if (ImGui::Button("Save", ImVec2(120, 30)) || ImGui::IsKeyPressed(ImGuiKey_Enter)) {
             pasteTime = tempPasteTime;
             listenTime = templistenTime;
             showPasswordTime = tempShowPasswordTime;
             shortcutKey = tempShortcutKey;
             shortcutKeyName = tempShortcutKeyName;
+            passwordChangeInterval = tempPasswordChangeInterval;
+            deletedPasswordKeepTime = tempDeletedPasswordKeepTime;
 
-            SaveSettings(pasteTime, listenTime, showPasswordTime, shortcutKey, sectionLength);
+            SaveSettings(pasteTime, listenTime, showPasswordTime, shortcutKey, sectionLength, passwordChangeInterval, deletedPasswordKeepTime);
 
             showSettingsWindow = false;
             firstOpen = true;
@@ -1578,6 +1640,8 @@ static void RenderSettingsWindow() {
             tempShowPasswordTime = showPasswordTime;
             tempShortcutKey = shortcutKey;
             tempShortcutKeyName = shortcutKeyName;
+            tempPasswordChangeInterval = tempPasswordChangeInterval;
+            tempDeletedPasswordKeepTime = tempDeletedPasswordKeepTime;
             
             showSettingsWindow = false;
             firstOpen = true;

@@ -225,6 +225,26 @@ bool PurgeDeletedPasswords(sqlite3* db) {
     return false;
 }
 
+bool MarkReplacementNotifications(sqlite3* db, int replacementInterval) {
+    const char* markReplacementSql =
+        "UPDATE passwords "
+        "SET gotReplacementNotification = 1 "
+        "WHERE date(creation_datetime) <= date('now', ? || ' days') "
+        "AND gotReplacementNotification = 0;";
+
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db, markReplacementSql, -1, &stmt, nullptr) == SQLITE_OK) {
+        std::string interval = "-" + std::to_string(replacementInterval);
+        sqlite3_bind_text(stmt, 1, interval.c_str(), -1, SQLITE_STATIC);
+        bool success = sqlite3_step(stmt) == SQLITE_DONE;
+        sqlite3_finalize(stmt);
+
+        return success;
+    }
+
+    return false;
+}
+
 std::vector<Tag> GetAllTags(sqlite3* db) {
     std::vector<Tag> tags;
     sqlite3_stmt* stmt;
