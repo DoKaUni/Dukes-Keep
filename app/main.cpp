@@ -151,6 +151,7 @@ static bool HandleLogin(const std::string& keyFile, const std::string& dbFile, s
 static void Authentication(ImGuiIO& io, const std::string& keyFile, const std::string& dbFile, sqlite3*& db, const bool firstRun, bool& result);
 
 // Management Functions
+static void HandlePasswordDelete(sqlite3* db, PasswordEntry* password);
 static void SavePassword(sqlite3* db);
 static std::string DecryptPassword();
 static void monitorKeyPress();
@@ -176,6 +177,7 @@ static void RenderMainUI(sqlite3* db, const int windowWidth, const int windowHei
 static int InputTextCallback(ImGuiInputTextCallbackData* data);
 static bool CheckPositiveInt(const int integer);
 static bool IsPrintableVirtualKey(UINT vkCode);
+static std::string GetCurrentDateTime();
 
 int main(int, char**) {
     sqlite3* db;
@@ -421,6 +423,16 @@ static bool IsPrintableVirtualKey(UINT vkCode) {
     }
 
     return false;
+}
+
+std::string GetCurrentDateTime() {
+    auto now = std::time(nullptr);
+    auto tm = *std::localtime(&now);
+
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
+
+    return oss.str();
 }
 
 /*
@@ -775,7 +787,7 @@ static void Authentication(ImGuiIO& io, const std::string& keyFile, const std::s
 
             LoadSettings();
 
-            PurgeDeletedPasswords(db);
+            PurgeDeletedPasswords(db, deletedPasswordKeepTime);
             MarkReplacementNotifications(db, passwordChangeInterval);
             passwords = GetAllPasswords(db);
             InitializeDefaultTabs();
@@ -794,6 +806,15 @@ static void Authentication(ImGuiIO& io, const std::string& keyFile, const std::s
 /*
  * Management Functions
 */
+
+static void HandlePasswordDelete(sqlite3* db, PasswordEntry* password){
+    std::string newDateTime = GetCurrentDateTime();
+
+    if (SetPasswordDeletedStatus(db, password->GetId(), true, newDateTime.c_str())) {
+        password->SetIsDeleted(true);
+        password->SetCreationDateTime(newDateTime);
+    }
+}
 
 static void SavePassword(sqlite3* db) {
     int userPasswordLength = passwordLengths[sectionLength - 2].at(entryWindowState.passwordLengthIndex);
@@ -889,8 +910,7 @@ static void SavePassword(sqlite3* db) {
     passwords.push_back(newEntry);
 
     if(showReplaceEntryWindow)
-        if(SetPasswordDeletedStatus(db, entryWindowState.ReplacedEntry->GetId(), true))
-            entryWindowState.ReplacedEntry->SetIsDeleted(true);
+        HandlePasswordDelete(db, entryWindowState.ReplacedEntry);
 }
 
 static std::string DecryptPassword(){
@@ -1409,8 +1429,7 @@ static void RenderManagerTab(ManagerTab& tab, sqlite3* db) {
             
             if (!ImGui::IsPopupOpen("Password Entry Deletion") && dialogAnswer) {
                 if (*dialogAnswer)
-                    if (SetPasswordDeletedStatus(db, filteredPasswords[tab.selectedItem]->GetId(), true))
-                        filteredPasswords[tab.selectedItem]->SetIsDeleted(true);
+                    HandlePasswordDelete(db, filteredPasswords[tab.selectedItem]);
 
                 activeDialog = DialogType::None;
                 dialogAnswer.reset();
@@ -1422,8 +1441,7 @@ static void RenderManagerTab(ManagerTab& tab, sqlite3* db) {
             
             if (!ImGui::IsPopupOpen("Password Entry Restoration") && dialogAnswer) {
                 if (*dialogAnswer)
-                    if (SetPasswordDeletedStatus(db, filteredPasswords[tab.selectedItem]->GetId(), false))
-                        filteredPasswords[tab.selectedItem]->SetIsDeleted(false);
+                    HandlePasswordDelete(db, filteredPasswords[tab.selectedItem]);
 
                 activeDialog = DialogType::None;
                 dialogAnswer.reset();

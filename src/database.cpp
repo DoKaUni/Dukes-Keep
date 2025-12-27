@@ -138,13 +138,14 @@ void InsertPassword(sqlite3 *db, const std::string &name, const std::string &use
     }
 }
 
-bool SetPasswordDeletedStatus(sqlite3* db, int passwordId, bool isDeleted) {
+bool SetPasswordDeletedStatus(sqlite3* db, int passwordId, bool isDeleted, const char* changedDateTime) {
     sqlite3_stmt* stmt;
-    const char* sql = "UPDATE passwords SET isDeleted = ? WHERE id = ?";
-    
+    const char* sql = "UPDATE passwords SET isDeleted = ?, creation_datetime = ? WHERE id = ?";
+
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) == SQLITE_OK) {
         sqlite3_bind_int(stmt, 1, isDeleted ? 1 : 0);
-        sqlite3_bind_int(stmt, 2, passwordId);
+        sqlite3_bind_text(stmt, 2, changedDateTime, -1, SQLITE_STATIC);
+        sqlite3_bind_int(stmt, 3, passwordId);
         bool success = sqlite3_step(stmt) == SQLITE_DONE;
         sqlite3_finalize(stmt);
 
@@ -203,26 +204,41 @@ std::vector<PasswordEntry> GetAllPasswords(sqlite3 *db) {
     return entries;
 }
 
-bool PurgeDeletedPasswords(sqlite3* db) {
-    const char* deleteTagsSql = "DELETE FROM password_tags WHERE password_id IN "
-                              "(SELECT id FROM passwords WHERE isDeleted = 1)";
-    sqlite3_stmt* stmt;
-    
+bool PurgeDeletedPasswords(sqlite3* db, int deletedPasswordKeepTime) {
+    sqlite3_stmt* stmt = nullptr;
+    bool success = false;
+
+    const char* deleteTagsSql =
+        "DELETE FROM password_tags WHERE password_id IN "
+        "(SELECT id FROM passwords WHERE isDeleted = 1"
+        " AND (? = 0 OR date(creation_datetime) <= date('now', '-' || ? || ' days')))";
+
     if (sqlite3_prepare_v2(db, deleteTagsSql, -1, &stmt, nullptr) != SQLITE_OK)
         return false;
 
-    sqlite3_step(stmt);
-    sqlite3_finalize(stmt);
-    
-    const char* deletePasswordsSql = "DELETE FROM passwords WHERE isDeleted = 1";
-    if (sqlite3_prepare_v2(db, deletePasswordsSql, -1, &stmt, nullptr) == SQLITE_OK) {
-        bool success = sqlite3_step(stmt) == SQLITE_DONE;
+    sqlite3_bind_int(stmt, 1, deletedPasswordKeepTime);
+    sqlite3_bind_int(stmt, 2, deletedPasswordKeepTime);
+
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
         sqlite3_finalize(stmt);
-
-        return success;
+        return false;
     }
+    sqlite3_finalize(stmt);
 
-    return false;
+    const char* deletePasswordsSql =
+        "DELETE FROM passwords WHERE isDeleted = 1"
+        " AND (? = 0 OR date(creation_datetime) <= date('now', '-' || ? || ' days'))";
+
+    if (sqlite3_prepare_v2(db, deletePasswordsSql, -1, &stmt, nullptr) != SQLITE_OK)
+        return false;
+
+    sqlite3_bind_int(stmt, 1, deletedPasswordKeepTime);
+    sqlite3_bind_int(stmt, 2, deletedPasswordKeepTime);
+
+    success = sqlite3_step(stmt) == SQLITE_DONE;
+    sqlite3_finalize(stmt);
+
+    return success;
 }
 
 bool MarkReplacementNotifications(sqlite3* db, int replacementInterval) {

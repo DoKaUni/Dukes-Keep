@@ -36,6 +36,7 @@ public:
          tags(tags) {}
 
     // Setters
+    void SetCreationDateTime(std::string datetime) { creation_datetime = datetime; }
     void SetLastUsedDatetime(const std::string& datetime) { last_used_datetime = datetime; }
     void SetPassword(const std::vector<unsigned char>& newPassword) { password = newPassword; }
     void SetIsDeleted(bool deleted) { isDeleted = deleted; }
@@ -140,9 +141,10 @@ void InsertPassword(sqlite3 *db, const std::string &name, const std::string &use
  * @param db The SQLite database connection.
  * @param passwordId The ID of the password entry to update.
  * @param isDeleted A flag indicating if the password should be marked as deleted (true) or not (false).
+ * @param changedDateTime A buffer that will store the changed password entry's creation_datetime.
  * @return True if the status was updated successfully, false otherwise.
  */
-bool SetPasswordDeletedStatus(sqlite3* db, int passwordId, bool isDeleted);
+bool SetPasswordDeletedStatus(sqlite3* db, int passwordId, bool isDeleted, const char* changedDateTime);
 
 /**
  * Retrieves all password entries from the database.
@@ -153,18 +155,19 @@ bool SetPasswordDeletedStatus(sqlite3* db, int passwordId, bool isDeleted);
 std::vector<PasswordEntry> GetAllPasswords(sqlite3 *db);
 
 /**
- * Deletes all passwords marked as deleted from the database.
+ * Checks marked password entries, based on `deletedPasswordKeepTim` (days), and deletes them from the database.
  * 
  * @param db The SQLite database connection.
+ * @param deletedPasswordKeepTime The time (days) that deletion marked password entries need to be older than to be deleted.
  * @return True if the passwords were purged successfully, false otherwise.
  */
-bool PurgeDeletedPasswords(sqlite3* db);
+bool PurgeDeletedPasswords(sqlite3* db, int deletedPasswordKeepTime);
 
 /**
  * Marks all the passwords that are found to be older than the `replacementInterval` (days)
  * 
  * @param db The SQLite database connection.
- * @param replacementInterval 
+ * @param replacementInterval The time (days) that password entries need to be older than, to be marked. 
  * 
  * @return True if passwords were marked, false otherwise.
  */

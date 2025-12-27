@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.14)
 # Set project name, version and languages here. (change as needed)
 # Version numbers are available by including "exampleConfig.h" in
 # the source. See exampleConfig.h.in for some more details.
-project(DUKES_KEEP VERSION 0.3.1.0 LANGUAGES CXX)
+project(DUKES_KEEP VERSION 0.3.2.0 LANGUAGES CXX)
 
 # Options: Things you can set via commandline options to cmake (e.g. -DENABLE_LTO=[ON|OFF])
 option(ENABLE_WARNINGS_SETTINGS "Allow target_set_warnings to add flags and defines.
